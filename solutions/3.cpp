@@ -108,6 +108,7 @@ WirePath parse_wire_path(const std::string& encoded_path)
     int y2 = 0;
     int total_wire_length = 0;
     WirePath wire_path;
+    wire_path.reserve(encoded_path.size() / 5);
 
     auto move_wire_tip = [&](char dir, int len) {
         x1 = x2;
