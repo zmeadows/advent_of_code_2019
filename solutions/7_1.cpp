@@ -1,10 +1,13 @@
 #include <assert.h>
 
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <vector>
+
+// #define DEBUG_COMPUTER
 
 enum class ParameterMode { Position, Immediate };
 
@@ -128,55 +131,32 @@ std::optional<Instruction> parse_instruction(const std::vector<long>& program, s
     return inst;
 };
 
-// std::ostream& operator<<(std::ostream& os, const Instruction& inst)
-// {
-//     switch (inst.op) {
-//         case Op::Addition:
-//             os << "CODE: 1 (ADDITION)" << std::endl;
-//             break;
-//         case Op::Multiplication:
-//             os << "CODE: 2 (MULITPLICATION)" << std::endl;
-//             break;
-//         case Op::Input:
-//             os << "CODE: 3 (TERMINAL INPUT)" << std::endl;
-//             break;
-//         case Op::Output:
-//             os << "CODE: 4 (TERMINAL OUTPUT)" << std::endl;
-//             break;
-//         case Op::Halt:
-//             os << "CODE: 99 (HALT)" << std::endl;
-//             break;
-//     };
-//
-//     const auto pcount = PARAM_COUNT(inst.op);
-//     for (auto i = 0; i < pcount; i++) {
-//         const auto mode = inst.params[i].mode;
-//         const auto value = inst.params[i].value;
-//
-//         os << "PARAM " << i << " : " << value;
-//         switch (inst.params[i].mode) {
-//             case ParameterMode::Position:
-//                 os << " (POSITION_MODE)" << std::endl;
-//                 break;
-//             case ParameterMode::Immediate:
-//                 os << " (IMMEDIATE_MODE)" << std::endl;
-//                 break;
-//         };
-//     };
-//
-//     os << std::endl;
-//
-//     return os;
-// }
-
-long run_program(std::vector<long> program, int input)
+long run_program(std::vector<long> program, int phase, int input)
 {
     const auto original_program_size = program.size();
     long pc = 0;
     bool finished = false;
-    bool input_instruction_encountered = false;
+    int input_instruction_encountered = 0;
+
+#ifdef DEBUG_COMPUTER
+    std::cout << std::endl;
+    std::cout << "Running fresh program with phase: " << phase << std::endl
+              << "                           input: " << input << std::endl;
+    std::cout << std::endl;
+#endif
+
+    auto print_program = [&program](void) {
+#ifdef DEBUG_COMPUTER
+        for (auto i = 0; i < program.size(); i++) {
+            std::cout << "[" << i << "] " << program[i] << " ";
+        }
+        std::cout << std::endl << std::endl;
+#endif
+    };
 
     while (!finished) {
+        print_program();
+
         bool increment_pc_by_par_count = true;
 
         // ensure we aren't accidentally modifying program length
@@ -213,18 +193,25 @@ long run_program(std::vector<long> program, int input)
             }
         }
         else if (inst.op == Op::Input) {
-            assert(!input_instruction_encountered);
-            input_instruction_encountered = true;
+            assert(input_instruction_encountered < 2);
+            input_instruction_encountered++;
             const long addr = inst.params[0].value;
             assert(inst.params[0].mode == ParameterMode::Position);
 
-            program[addr] = input;
+            if (input_instruction_encountered == 1) {
+                program[addr] = phase;
+            }
+            else {
+                assert(input_instruction_encountered == 2);
+                program[addr] = input;
+            }
         }
         else if (inst.op == Op::Output) {
             const long value_to_output = extract(inst.params[0]);
-            std::cout << value_to_output << std::endl;
+            return value_to_output;
         }
         else if (inst.op == Op::Halt) {
+            assert(false);
             finished = true;
         }
         else if (inst.op == Op::JumpIfTrue) {
@@ -271,13 +258,32 @@ long run_program(std::vector<long> program, int input)
     return 0;
 }
 
+void run_over_permutations(const std::vector<long>& program, std::array<int, 5> phases, int L,
+                           long& max_output)
+{
+    if (L == phases.size() - 1) {
+        long input = 0;
+        for (auto amp_index = 0; amp_index < 5; amp_index++) {
+            input = run_program(program, phases[amp_index], input);
+        }
+        max_output = input > max_output ? input : max_output;
+    }
+    else {
+        for (size_t R = 0; R < phases.size(); R++) {
+            std::swap(phases[L], phases[R]);
+            run_over_permutations(program, phases, L + 1, max_output);
+            std::swap(phases[L], phases[R]);
+        }
+    }
+}
+
 int main(void)
 {
     std::vector<long> program;
 
     {  // load program from file
         program.reserve(256);
-        std::ifstream infile("../inputs/5.txt");
+        std::ifstream infile("../inputs/7.txt");
 
         std::string istr;
 
@@ -286,7 +292,21 @@ int main(void)
         }
     }
 
-    run_program(program, 5);
+    const auto program_copy = program;
+
+    long max_output = -1;
+    run_over_permutations(program, {0, 1, 2, 3, 4}, 0, max_output);
+    std::cout << max_output << std::endl;
+
+    // int input = 0;
+
+    // for (auto amp_index = 0; amp_index < 5; amp_index++) {
+    //     input = run_program(program_copy, phases[amp_index], input);
+    // }
+
+    // max_output = input > max_output ? input : max_output;
+
+    // std::cout << max_output << std::endl;
 
     return 0;
 }
