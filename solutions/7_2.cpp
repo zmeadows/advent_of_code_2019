@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -353,6 +354,11 @@ long find_max_thruster_signal(const std::vector<long>& initial_program_state)
 
 int main(void)
 {
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie();
+
+    auto start_time = std::chrono::steady_clock::now();
+
     std::vector<long> program;
 
     {  // load program from file
@@ -367,6 +373,11 @@ int main(void)
     }
 
     std::cout << find_max_thruster_signal(program) << std::endl;
+
+    const auto end_time = std::chrono::steady_clock::now();
+
+    std::cout << std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count()
+              << "us" << std::endl;
 
     return 0;
 }
