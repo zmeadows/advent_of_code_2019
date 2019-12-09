@@ -196,9 +196,10 @@ class IntCodeVM {
 
     inline void allocate_up_to(size_t address)
     {
-        if (m_state.size() > address) return;
+        const size_t new_size_required = address + 1;
+        if (m_state.size() >= new_size_required) return;
         // extend program memory and fill new memory with zeros
-        m_state.resize(address + 1, 0);
+        m_state.resize(new_size_required, 0);
     }
 
     inline IntType read_memory(size_t address)
