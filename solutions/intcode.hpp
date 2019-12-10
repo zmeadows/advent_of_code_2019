@@ -13,7 +13,7 @@
 namespace intcode_detail {
 
 // as of day 9, we need to support very large numbers
-using IntType = __int128;
+using IntType = int64_t;
 
 enum class Op {
     Addition,
@@ -102,7 +102,7 @@ struct Parameter {
 struct Instruction {
     // since max_param_count() will always be small, we just keep an array of that size for each
     // instruction, rather than use a vector and take a performance hit from pointer indirections
-    std::array<Parameter, max_param_count()> params;
+    Parameter params[max_param_count()];
     Op op;
     IntType code;
 };
@@ -173,7 +173,7 @@ static std::vector<IntType> read_program_from_file(const char* filepath)
 
     while (std::getline(infile, istr, ',')) {
         try {
-            program.push_back(stoi128(istr));
+            program.push_back(std::stoi(istr));
         }
         catch (...) {
             std::cerr << "Failed to parse program integer input: " << istr << std::endl;
@@ -225,25 +225,26 @@ class IntCodeVM {
         inst.op = code_to_op(opcode % 100);
         panic_if(inst.op == Op::Unknown, "Unknown opcode encountered.");
 
-        auto int_to_parameter_mode = [](int i) {
-            if (i == 0) {
-                return Parameter::Mode::Position;
-            }
-            else if (i == 1) {
-                return Parameter::Mode::Immediate;
-            }
-            else {
-                panic_if(i != 2, "Invalid parameter mode specifier encountered.");
-                return Parameter::Mode::Relative;
-            }
-        };
-
         const int pcount = param_count(inst.op);
-        assert(pcount >= 0);
+        assert(pcount >= 0 && pcount < 10);
+
+        const int powers_of_ten[max_param_count()] = {100, 1000, 10000};
 
         for (int i = 0; i < pcount; i++) {
-            const int accum = static_cast<int>(std::pow(10, i + 2));
-            inst.params[i].mode = int_to_parameter_mode((opcode / accum) % 10);
+            const int mode_int = (opcode / powers_of_ten[i]) % 10;
+            auto& mode = inst.params[i].mode;
+
+            if (mode_int == 0) {
+                mode = Parameter::Mode::Position;
+            }
+            else if (mode_int == 1) {
+                mode = Parameter::Mode::Immediate;
+            }
+            else {
+                assert(mode_int == 2);
+                mode = Parameter::Mode::Relative;
+            }
+
             inst.params[i].value = read_memory(m_pc + i + 1);
         }
 
@@ -282,7 +283,10 @@ class IntCodeVM {
     }
 
 public:
-    IntCodeVM(const char* filepath) : IntCodeVM(read_program_from_file(filepath)) {}
+    IntCodeVM(const char* filepath) : IntCodeVM(read_program_from_file(filepath))
+    {
+        allocate_up_to(2000);
+    }
 
     void run_until_halt_with_single_input(IntType user_input)
     {
