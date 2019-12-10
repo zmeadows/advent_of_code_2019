@@ -122,15 +122,12 @@ void compute_asteroid_fov(const AsteroidMap& asteroids, std::vector<std::vector<
         const int x = x0 + dx;
         const int y = y0 + dy;
 
+        // we loop off the map sometimes (unless we start loop in the exact center square)
         if (is_point_on_map(x, y)) {
             squares_visited++;
 
-            const bool point_currently_visible = is_point_on_map(x, y) && fov[y][x];
-
-            // if point already blocked, nothing to do
-            if (point_currently_visible && asteroids.is_point_occupied(x, y)) {
-                // found a non-blocked asteroid. Now block all further asteroids in same line of sight.
-
+            if (asteroids.is_point_occupied(x, y) && fov[y][x]) {
+                // Found a non-blocked asteroid. Now block all further asteroids in same line of sight.
                 // Have to use GCD of dx/dy here to make sure we look towards the line of sight in the
                 // smallest steps possible and don't jump over asteroids we should be blocking
                 const int den = gcd(std::abs(dx), std::abs(dy));
@@ -140,6 +137,7 @@ void compute_asteroid_fov(const AsteroidMap& asteroids, std::vector<std::vector<
                 int y2 = y + dy_block;
 
                 while (is_point_on_map(x2, y2)) {
+                    // blocking all field of view beyond this asteroid, in the direction of line of sight
                     fov[y2][x2] = false;
                     x2 += dx_block;
                     y2 += dy_block;
@@ -178,10 +176,11 @@ void compute_asteroid_fov(const AsteroidMap& asteroids, std::vector<std::vector<
                 break;
             case Direction::Right:
                 if (dx == loop_count) {
+                    // loop finished, now move to the next loop, starting in the top right again
                     loop_count++;
-                    dir = Direction::Down;
                     dx = loop_count;
                     dy = loop_count;
+                    dir = Direction::Down;
                 }
                 else {
                     dx++;
