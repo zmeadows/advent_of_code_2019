@@ -129,18 +129,15 @@ void compute_asteroid_fov(const AsteroidMap& asteroids, std::vector<std::vector<
 
             // if point already blocked, nothing to do
             if (point_currently_visible && asteroids.is_point_occupied(x, y)) {
-                // found a non-blocked asteroid. block all further asteroids in same line of sight.
+                // found a non-blocked asteroid. Now block all further asteroids in same line of sight.
 
+                // Have to use GCD of dx/dy here to make sure we look towards the line of sight in the
+                // smallest steps possible and don't jump over asteroids we should be blocking
                 const int den = gcd(std::abs(dx), std::abs(dy));
                 const int dx_block = dx / den;
                 const int dy_block = dy / den;
                 int x2 = x + dx_block;
                 int y2 = y + dy_block;
-
-                // std::cout << "gcd =  " << den << std::endl;
-                // std::cout << "dx/dy = " << dx << " " << dy << std::endl;
-                // std::cout << "dx/dy block = " << dx_block << " " << dy_block << std::endl;
-                // std::cout << std::endl;
 
                 while (is_point_on_map(x2, y2)) {
                     fov[y2][x2] = false;
@@ -183,7 +180,8 @@ void compute_asteroid_fov(const AsteroidMap& asteroids, std::vector<std::vector<
                 if (dx == loop_count) {
                     loop_count++;
                     dir = Direction::Down;
-                    dy--;
+                    dx = loop_count;
+                    dy = loop_count;
                 }
                 else {
                     dx++;
@@ -194,47 +192,6 @@ void compute_asteroid_fov(const AsteroidMap& asteroids, std::vector<std::vector<
         assert(!(dx == 0 && dy == 0));
     }
 }
-
-// std::vector<std::vector<bool>> compute_visibility_map(const std::vector<std::vector<bool>>&
-// asteroid_map,
-//                                                       int x, int y)
-// {
-//     auto is_asteroid_at = [&](int x, int y) { return asteroid_map[y][x]; };
-//
-//     if (asteroid_map[y][x] == false) {
-//         return -1;
-//     }
-//
-//     const size_t x_dim = asteroid_map[0].size();
-//     const size_t y_dim = asteroid_map.size();
-//
-//     std::vector<float> sight_angles_blocked;
-//     sight_angles_blocked.reserve(0.5 * x_dim * y_dim);
-//
-//     auto float_equals = [](float a, float b) { return std::fabs(a - b) < 1e-7; };
-//
-//     int visibility = 0;
-//
-//     for (auto ix = 0; ix < x_dim; ix++) {
-//         for (auto iy = 0; iy < y_dim; iy++) {
-//             if (ix == x && iy == y) continue;
-//
-//             bool blocked = false;
-//             for (float angle : sight_angles_blocked) {
-//                 if (float_equals(angle, dydx)) {
-//                     blocked = true;
-//                 }
-//             }
-//
-//             if (!blocked) {
-//                 visibility++;
-//                 sight_angles_blocked.push_back(dydx);
-//             }
-//         }
-//     }
-//
-//     return visibility;
-// }
 
 int main(void)
 {
