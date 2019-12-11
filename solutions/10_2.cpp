@@ -297,53 +297,6 @@ inline bool compare_asteroid_angles_relative_to_station(std::pair<int, int> a, s
     return compute_asteroid_angle_relative_to_station(a) < compute_asteroid_angle_relative_to_station(b);
 }
 
-// std::pair<int, int> find_coordinates_of_two_hundreth_vaporized_asteroid_from_best_monitoring_station(
-//     const AsteroidMap& _asteroids)
-// {
-//     AsteroidMap asteroids(_asteroids);
-//
-//     const int XDIM = asteroids.dimension_x();
-//     const int YDIM = asteroids.dimension_y();
-//
-//     BestMonitoringStation best = find_best_monitoring_location(asteroids);
-//
-//     const int x0 = best.x_loc;
-//     const int y0 = best.y_loc;
-//
-//     int vaped_nation_count = 0;
-//
-//     std::vector<std::pair<int, int>> vape_coords;
-//     vape_coords.reserve(best.view_count);
-//
-//     while (true) {
-//         vape_coords.clear();
-//
-//         auto vis = find_visible_asteroids(asteroids, best.fov);
-//
-//         for (auto x = 0; x < XDIM; x++) {
-//             for (auto y = 0; y < YDIM; y++) {
-//                 if (vis[y][x]) {
-//                     vape_coords.push_back({x - x0, y - y0});
-//                 }
-//             }
-//         }
-//
-//         sort(vape_coords.begin(), vape_coords.end(), compare_asteroid_angle);
-//
-//         for (auto [x_vis, y_vis] : vape_coords) {
-//             asteroids.destroy_asteroid_at(x0 + x_vis, y0 + y_vis);
-//             vaped_nation_count++;
-//             if (vaped_nation_count == 200) {
-//                 return {x0 + x_vis, y0 + y_vis};
-//             }
-//         }
-//
-//         compute_asteroid_fov(asteroids, best.fov, x0, y0);
-//     }
-//
-//     return {-1, -1};
-// }
-
 int main(void)
 {
     auto start_time = std::chrono::steady_clock::now();
