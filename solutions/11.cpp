@@ -148,6 +148,8 @@ public:
             }
         }
 
+        assert(m_computer.is_halted());
+
         return m_panels_painted;
     }
 };

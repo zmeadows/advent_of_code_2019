@@ -239,6 +239,8 @@ public:
         allocate_up_to(2000);
     }
 
+    bool is_halted(void) const { return m_halted; }
+
     void run_until_halt_with_single_input(IntType user_input)
     {
         auto start_time = std::chrono::steady_clock::now();

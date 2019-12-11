@@ -21,52 +21,53 @@ static int gcd(int a, int b)
     return gcd(a, b - a);
 }
 
-class AsteroidMap {
-    std::vector<std::vector<bool>> m_occupancy;
-    int m_xdim;
-    int m_ydim;
+static std::vector<std::vector<bool>> read_occupancy_from_file(const char* filepath)
+{
+    std::ifstream infile(filepath);
+    std::string line;
 
-    static std::vector<std::vector<bool>> read_occupancy_from_file(const char* filepath)
-    {
-        std::ifstream infile(filepath);
-        std::string line;
+    std::getline(infile, line);
+    const int xdim = line.size();
 
-        std::getline(infile, line);
-        const int xdim = line.size();
+    std::vector<std::vector<bool>> occupancy;
 
-        std::vector<std::vector<bool>> occupancy;
+    do {
+        std::vector<bool> occupancy_row;
+        occupancy_row.reserve(xdim);
 
-        do {
-            std::vector<bool> occupancy_row;
-            occupancy_row.reserve(xdim);
+        for (auto ch : line) {
+            occupancy_row.push_back(ch == '#');
+        }
 
-            for (auto ch : line) {
-                occupancy_row.push_back(ch == '#');
-            }
+        occupancy.push_back(occupancy_row);
 
-            occupancy.push_back(occupancy_row);
+    } while (std::getline(infile, line));
 
-        } while (std::getline(infile, line));
+    const int ydim = occupancy.size();
 
-        const int ydim = occupancy.size();
+    assert(xdim > 0);
+    assert(ydim > 0);
 
-        assert(xdim > 0);
-        assert(ydim > 0);
+    std::cout << "Successfully read asteroid map from file: " << filepath << std::endl;
+    std::cout << "Dimensions: " << xdim << " by " << ydim << std::endl;
+    std::cout << std::endl;
 
-        std::cout << "Successfully read asteroid map from file: " << filepath << std::endl;
-        std::cout << "Dimensions: " << xdim << " by " << ydim << std::endl;
-        std::cout << std::endl;
-
-        for (auto y = 0; y < ydim; y++) {
-            for (auto x = 0; x < xdim; x++) {
-                std::cout << (occupancy[y][x] ? '#' : '.');
-            }
-            std::cout << std::endl;
+    std::cout << "Asteroid Map:" << std::endl;
+    for (auto y = 0; y < ydim; y++) {
+        for (auto x = 0; x < xdim; x++) {
+            std::cout << (occupancy[y][x] ? '#' : '.');
         }
         std::cout << std::endl;
-
-        return occupancy;
     }
+    std::cout << std::endl;
+
+    return occupancy;
+}
+
+class AsteroidMap {
+    std::vector<std::vector<bool>> m_occupancy;
+    const int m_xdim;
+    const int m_ydim;
 
 public:
     AsteroidMap(const char* filepath)
@@ -91,33 +92,41 @@ public:
         }
     }
 
-    inline void destroy_asteroid_at(int x, int y) { m_occupancy[y][x] = false; }
-
     int dimension_x(void) const { return m_xdim; }
     int dimension_y(void) const { return m_ydim; }
+
+    inline void vaporize_at(int x, int y) { m_occupancy[y][x] = false; }
 };
 
+// pass fov_buffer in as argument to avoid un-necessary re-allocations
 static void compute_asteroid_fov(const AsteroidMap& asteroids,
                                  std::vector<std::vector<bool>>& fov_buffer, int x0, int y0)
 {
     const auto XDIM = asteroids.dimension_x();
     const auto YDIM = asteroids.dimension_y();
-    assert(fov_buffer.size() == YDIM && fov_buffer[0].size() == XDIM);
+
+    if (fov_buffer.size() != YDIM || fov_buffer[0].size() != XDIM) {
+        fov_buffer.clear();
+        fov_buffer = asteroids.allocate_fov_buffer();
+    }
 
     auto is_point_on_map = [&](int x, int y) { return (x >= 0 && x < XDIM && y >= 0 && y < YDIM); };
 
     assert(is_point_on_map(x0, y0));
 
-    // reset fov to all be visible, before we block in a spiral below
+    // set all asteroids to true, all empty spaces to false
+    // since we only care about what asteroids we can see
     for (auto y = 0; y < YDIM; y++) {
         for (auto x = 0; x < XDIM; x++) {
-            fov_buffer[y][x] = true;
+            fov_buffer[y][x] = asteroids.is_point_occupied(x, y);
         }
     }
 
+    auto block_point = [&](int x_block, int y_block) { fov_buffer[y_block][x_block] = false; };
+
     // for our purposes here, don't want to count the asteroid itself
     // for a typical FOV algorithm this wouldn't be the case
-    fov_buffer[y0][x0] = false;
+    block_point(x0, y0);
 
     enum class Direction { Up, Down, Left, Right };
     int dx = 1;
@@ -127,7 +136,7 @@ static void compute_asteroid_fov(const AsteroidMap& asteroids,
 
     int squares_visited = 0;
 
-    // visit all squares expect one where we are computing visibility
+    // visit all squares except one where we are computing visibility
     while (squares_visited < XDIM * YDIM - 1) {
         const int x = x0 + dx;
         const int y = y0 + dy;
@@ -135,8 +144,8 @@ static void compute_asteroid_fov(const AsteroidMap& asteroids,
         if (is_point_on_map(x, y)) {
             squares_visited++;
 
-            const bool point_currently_visible = fov_buffer[y][x];
             const bool point_is_an_asteroid = asteroids.is_point_occupied(x, y);
+            const bool point_currently_visible = fov_buffer[y][x];
 
             if (point_currently_visible && point_is_an_asteroid) {
                 // found a non-blocked asteroid, so block all further asteroids in same line of sight.
@@ -148,7 +157,7 @@ static void compute_asteroid_fov(const AsteroidMap& asteroids,
                 int y2 = y + dy_block;
 
                 while (is_point_on_map(x2, y2)) {
-                    fov_buffer[y2][x2] = false;
+                    block_point(x2, y2);
                     x2 += dx_block;
                     y2 += dy_block;
                 }
@@ -207,7 +216,7 @@ struct BestMonitoringStation {
     std::vector<std::vector<bool>> fov;
 };
 
-BestMonitoringStation find_best_monitoring_location(const AsteroidMap& asteroids)
+BestMonitoringStation find_best_monitoring_station(const AsteroidMap& asteroids)
 {
     auto fov = asteroids.allocate_fov_buffer();
 
@@ -232,7 +241,7 @@ BestMonitoringStation find_best_monitoring_location(const AsteroidMap& asteroids
                     best.view_count = view_count;
                     best.x_loc = x0;
                     best.y_loc = y0;
-                    best.fov = fov;
+                    std::swap(best.fov, fov);
                 }
             }
         }
@@ -244,99 +253,137 @@ BestMonitoringStation find_best_monitoring_location(const AsteroidMap& asteroids
     return best;
 }
 
-std::vector<std::vector<bool>> find_visible_asteroids(const AsteroidMap& asteroids,
-                                                      const std::vector<std::vector<bool>>& fov)
+std::vector<std::pair<int, int>> convert_fov_to_positions(const std::vector<std::vector<bool>>& fov)
 {
-    // just a union of visible spots and spots with asteroids
-    const auto XDIM = asteroids.dimension_x();
-    const auto YDIM = asteroids.dimension_y();
+    std::vector<std::pair<int, int>> result;
+    result.reserve(fov.size());
 
-    std::vector<std::vector<bool>> visible = fov;
-    for (auto x = 0; x < XDIM; x++) {
-        for (auto y = 0; y < YDIM; y++) {
-            visible[y][x] = visible[y][x] & asteroids.is_point_occupied(x, y);
+    const auto ydim = fov.size();
+    assert(ydim > 0);
+    const auto xdim = fov[0].size();
+
+    for (auto y = 0; y < ydim; y++) {
+        for (auto x = 0; x < xdim; x++) {
+            if (fov[y][x]) result.emplace_back(x, y);
         }
     }
-    return visible;
+
+    return result;
 }
 
-bool compare_asteroid_angle(std::pair<int, int> a, std::pair<int, int> b)
+float compute_asteroid_angle_relative_to_station(std::pair<int, int> offset)
 {
-    // todo: broken
-    auto my_atan2 = [](float y, float x) -> float {
-        const float dot = std::sqrt(y * 1.f + x * 0.f);
-        const float mag = std::sqrt(x * x + y * y);
-        const float angle = std::acos(dot / mag);
+    const float dx = static_cast<float>(offset.first);
+    const float dy = static_cast<float>(offset.second);
+    assert(!(dx == 0 && dy == 0));
 
-        std::cout << angle << " @ " << x << "," << y << std::endl;
-        return angle;
-    };
+    const float a0 = std::atan2(1.f, 0.f);
+    const float a = std::atan2(dy, dx);
+    const float delta = a - a0;
 
-    return my_atan2(a.second, a.first) < my_atan2(b.second, b.first);
-}
-
-std::pair<int, int> find_coordinates_of_two_hundreth_vaporized_asteroid_from_best_monitoring_station(
-    const AsteroidMap& _asteroids)
-{
-    AsteroidMap asteroids(_asteroids);
-
-    const int XDIM = asteroids.dimension_x();
-    const int YDIM = asteroids.dimension_y();
-
-    BestMonitoringStation best = find_best_monitoring_location(asteroids);
-
-    const int x0 = best.x_loc;
-    const int y0 = best.y_loc;
-
-    int vaped_nation_count = 0;
-
-    std::vector<std::pair<int, int>> vape_coords;
-    vape_coords.reserve(best.view_count);
-
-    while (true) {
-        vape_coords.clear();
-
-        auto vis = find_visible_asteroids(asteroids, best.fov);
-
-        for (auto x = 0; x < XDIM; x++) {
-            for (auto y = 0; y < YDIM; y++) {
-                if (vis[y][x]) {
-                    vape_coords.push_back({x - x0, y - y0});
-                }
-            }
-        }
-
-        sort(vape_coords.begin(), vape_coords.end(), compare_asteroid_angle);
-
-        for (auto [x_vis, y_vis] : vape_coords) {
-            asteroids.destroy_asteroid_at(x0 + x_vis, y0 + y_vis);
-            vaped_nation_count++;
-            if (vaped_nation_count == 200) {
-                return {x0 + x_vis, y0 + y_vis};
-            }
-        }
-
-        compute_asteroid_fov(asteroids, best.fov, x0, y0);
+    if (delta < 0) {
+        return -1.f * delta;
     }
-
-    return {-1, -1};
+    else if (delta > 0) {
+        return 2 * M_PI - delta;
+    }
+    else {
+        return delta;
+    }
 }
+
+inline bool compare_asteroid_angles_relative_to_station(std::pair<int, int> a, std::pair<int, int> b)
+{
+    return compute_asteroid_angle_relative_to_station(a) < compute_asteroid_angle_relative_to_station(b);
+}
+
+// std::pair<int, int> find_coordinates_of_two_hundreth_vaporized_asteroid_from_best_monitoring_station(
+//     const AsteroidMap& _asteroids)
+// {
+//     AsteroidMap asteroids(_asteroids);
+//
+//     const int XDIM = asteroids.dimension_x();
+//     const int YDIM = asteroids.dimension_y();
+//
+//     BestMonitoringStation best = find_best_monitoring_location(asteroids);
+//
+//     const int x0 = best.x_loc;
+//     const int y0 = best.y_loc;
+//
+//     int vaped_nation_count = 0;
+//
+//     std::vector<std::pair<int, int>> vape_coords;
+//     vape_coords.reserve(best.view_count);
+//
+//     while (true) {
+//         vape_coords.clear();
+//
+//         auto vis = find_visible_asteroids(asteroids, best.fov);
+//
+//         for (auto x = 0; x < XDIM; x++) {
+//             for (auto y = 0; y < YDIM; y++) {
+//                 if (vis[y][x]) {
+//                     vape_coords.push_back({x - x0, y - y0});
+//                 }
+//             }
+//         }
+//
+//         sort(vape_coords.begin(), vape_coords.end(), compare_asteroid_angle);
+//
+//         for (auto [x_vis, y_vis] : vape_coords) {
+//             asteroids.destroy_asteroid_at(x0 + x_vis, y0 + y_vis);
+//             vaped_nation_count++;
+//             if (vaped_nation_count == 200) {
+//                 return {x0 + x_vis, y0 + y_vis};
+//             }
+//         }
+//
+//         compute_asteroid_fov(asteroids, best.fov, x0, y0);
+//     }
+//
+//     return {-1, -1};
+// }
 
 int main(void)
 {
+    auto start_time = std::chrono::steady_clock::now();
     std::ios_base::sync_with_stdio(false);
     std::cin.tie();
 
-    auto start_time = std::chrono::steady_clock::now();
     AsteroidMap asteroids("../inputs/10.txt");
-    auto coords =
-        find_coordinates_of_two_hundreth_vaporized_asteroid_from_best_monitoring_station(asteroids);
+    auto best_station = find_best_monitoring_station(asteroids);
     auto end_time = std::chrono::steady_clock::now();
 
-    std::cout << "answer: " << coords.first * 100 + coords.second << " @ " << coords.first << ","
-              << coords.second << std::endl;
+    std::cout << "part one computation time: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count()
+              << "us" << std::endl;
 
-    std::cout << "computation time: "
+    start_time = std::chrono::steady_clock::now();
+
+    std::vector<std::pair<int, int>> visible_asteroid_locations =
+        convert_fov_to_positions(best_station.fov);
+
+    // convert the locations into offsets relative to station
+    for (auto& [x, y] : visible_asteroid_locations) {
+        x -= best_station.x_loc;
+        y -= best_station.y_loc;
+        y *= -1;  // dealing with computer graphics style coordinate system where y increases moving
+                  // downard
+    }
+
+    std::sort(visible_asteroid_locations.begin(), visible_asteroid_locations.end(),
+              compare_asteroid_angles_relative_to_station);
+
+    for (auto& [x, y] : visible_asteroid_locations) {
+        std::cout << x << " " << y << std::endl;
+    }
+
+    std::cout << best_station.x_loc + visible_asteroid_locations[199].first << std::endl;
+    std::cout << best_station.y_loc - visible_asteroid_locations[199].second << std::endl;
+
+    end_time = std::chrono::steady_clock::now();
+
+    std::cout << "part two computation time: "
               << std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count()
               << "us" << std::endl;
 
