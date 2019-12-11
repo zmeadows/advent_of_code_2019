@@ -327,12 +327,10 @@ int main(void)
     std::sort(visible_asteroid_locations.begin(), visible_asteroid_locations.end(),
               compare_asteroid_angles_relative_to_station);
 
-    for (auto& [x, y] : visible_asteroid_locations) {
-        std::cout << x << " " << y << std::endl;
-    }
+    const int answer_x = best_station.x_loc + visible_asteroid_locations[199].first;
+    const int answer_y = best_station.y_loc - visible_asteroid_locations[199].second;
 
-    std::cout << best_station.x_loc + visible_asteroid_locations[199].first << std::endl;
-    std::cout << best_station.y_loc - visible_asteroid_locations[199].second << std::endl;
+    std::cout << "part two answer = " << answer_x * 100 + answer_y << std::endl;
 
     end_time = std::chrono::steady_clock::now();
 
