@@ -115,54 +115,6 @@ static void panic_if(bool condition, const char* msg)
     }
 };
 
-// from https://stackoverflow.com/questions/45608424/atoi-for-int128-t-type
-__int128 stoi128(const std::string& str)
-{
-    const char* s = str.c_str();
-
-    while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '+') ++s;
-    int sign = 1;
-    if (*s == '-') {
-        ++s;
-        sign = -1;
-    }
-    size_t digits = 0;
-    while (s[digits] >= '0' && s[digits] <= '9') ++digits;
-    char scratch[digits];
-    for (size_t i = 0; i < digits; ++i) scratch[i] = s[i] - '0';
-    size_t scanstart = 0;
-
-    __int128 result = 0;
-    __int128 mask = 1;
-    while (scanstart < digits) {
-        if (scratch[digits - 1] & 1) result |= mask;
-        mask <<= 1;
-        for (size_t i = digits - 1; i > scanstart; --i) {
-            scratch[i] >>= 1;
-            if (scratch[i - 1] & 1) scratch[i] |= 8;
-        }
-        scratch[scanstart] >>= 1;
-        while (scanstart < digits && !scratch[scanstart]) ++scanstart;
-        for (size_t i = scanstart; i < digits; ++i) {
-            if (scratch[i] > 7) scratch[i] -= 3;
-        }
-    }
-
-    return result * sign;
-}
-
-// inefficient, but we rarely call it
-std::string int128_to_string(__int128 num)
-{
-    std::string str;
-    do {
-        int digit = num % 10;
-        str = std::to_string(digit) + str;
-        num = (num - digit) / 10;
-    } while (num != 0);
-    return str;
-}
-
 static std::vector<IntType> read_program_from_file(const char* filepath)
 {
     std::vector<IntType> program;
@@ -173,7 +125,7 @@ static std::vector<IntType> read_program_from_file(const char* filepath)
 
     while (std::getline(infile, istr, ',')) {
         try {
-            program.push_back(std::stoi(istr));
+            program.push_back(std::stoll(istr));
         }
         catch (...) {
             std::cerr << "Failed to parse program integer input: " << istr << std::endl;
@@ -251,7 +203,6 @@ class IntCodeVM {
         return inst;
     }
 
-    // TODO: move this to Instruction struct member and do run-time checking of parameter index
     inline IntType extract_parameter(Parameter param)
     {
         switch (param.mode) {
@@ -295,7 +246,7 @@ public:
         std::optional<IntType> output = continue_execution(user_input);
 
         while (output) {
-            std::cout << int128_to_string(*output) << std::endl;
+            std::cout << *output << std::endl;
             output = continue_execution({});
         }
 
