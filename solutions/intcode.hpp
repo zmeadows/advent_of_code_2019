@@ -154,18 +154,6 @@ class IntCodeVM {
         m_state.resize(new_size_required, 0);
     }
 
-    inline IntType read_memory(size_t address)
-    {
-        allocate_up_to(address);
-        return m_state[address];
-    }
-
-    inline void write_memory(size_t address, IntType value)
-    {
-        allocate_up_to(address);
-        m_state[address] = value;
-    }
-
     Instruction parse_next_instruction(void)
     {
         panic_if(m_pc >= m_state.size(), "Program counter moved past end of memory.");
@@ -237,6 +225,18 @@ public:
     IntCodeVM(const char* filepath) : IntCodeVM(read_program_from_file(filepath))
     {
         allocate_up_to(2000);
+    }
+
+    inline IntType read_memory(size_t address)
+    {
+        allocate_up_to(address);
+        return m_state[address];
+    }
+
+    inline void write_memory(size_t address, IntType value)
+    {
+        allocate_up_to(address);
+        m_state[address] = value;
     }
 
     bool is_halted(void) const { return m_halted; }
