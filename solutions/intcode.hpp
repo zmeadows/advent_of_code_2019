@@ -119,7 +119,7 @@ static void panic_if(bool condition, const char* msg)
 static std::vector<IntType> read_program_from_file(const char* filepath)
 {
     std::vector<IntType> program;
-    program.reserve(256);
+    program.reserve(1024);
 
     std::ifstream infile(filepath);
     std::string istr;
@@ -223,11 +223,7 @@ private:
     };
 
     IntCodeVM(const std::vector<IntType>& program)
-        : m_memory(program),
-          m_pc(0),
-          m_state(State::ReadyToBegin),
-          m_relative_base(0),
-          m_input({})
+        : m_memory(program), m_pc(0), m_state(State::ReadyToBegin), m_relative_base(0), m_input({})
     {
     }
 
